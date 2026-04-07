@@ -922,6 +922,7 @@ def select_provider_and_model(args=None):
         "copilot": "GitHub Copilot",
         "anthropic": "Anthropic",
         "gemini": "Google AI Studio",
+        "aimlapi": "AI/ML API",
         "zai": "Z.AI / GLM",
         "kimi-coding": "Kimi / Moonshot",
         "minimax": "MiniMax",
@@ -945,6 +946,7 @@ def select_provider_and_model(args=None):
     top_providers = [
         ("nous", "Nous Portal (Nous Research subscription)"),
         ("openrouter", "OpenRouter (100+ models, pay-per-use)"),
+        ("aimlapi", "AI/ML API (400+ models, OpenAI-compatible aggregator)"),
         ("anthropic", "Anthropic (Claude models — API key or Claude Code)"),
         ("openai-codex", "OpenAI Codex"),
         ("copilot", "GitHub Copilot (uses GITHUB_TOKEN or gh auth token)"),
@@ -1057,7 +1059,7 @@ def select_provider_and_model(args=None):
         _model_flow_anthropic(config, current_model)
     elif selected_provider == "kimi-coding":
         _model_flow_kimi(config, current_model)
-    elif selected_provider in ("gemini", "zai", "minimax", "minimax-cn", "kilocode", "opencode-zen", "opencode-go", "ai-gateway", "alibaba", "huggingface"):
+    elif selected_provider in ("gemini", "aimlapi", "zai", "minimax", "minimax-cn", "kilocode", "opencode-zen", "opencode-go", "ai-gateway", "alibaba", "huggingface"):
         _model_flow_api_key_provider(config, selected_provider, current_model)
 
 
@@ -4244,7 +4246,7 @@ For more help on a command:
     )
     chat_parser.add_argument(
         "--provider",
-        choices=["auto", "openrouter", "nous", "openai-codex", "copilot-acp", "copilot", "anthropic", "gemini", "huggingface", "zai", "kimi-coding", "minimax", "minimax-cn", "kilocode"],
+        choices=["auto", "openrouter", "nous", "openai-codex", "copilot-acp", "copilot", "anthropic", "gemini", "huggingface", "aimlapi", "zai", "kimi-coding", "minimax", "minimax-cn", "kilocode"],
         default=None,
         help="Inference provider (default: auto)"
     )

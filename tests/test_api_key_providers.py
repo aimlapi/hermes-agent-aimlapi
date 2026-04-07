@@ -39,6 +39,7 @@ class TestProviderRegistry:
         ("copilot-acp", "GitHub Copilot ACP", "external_process"),
         ("copilot", "GitHub Copilot", "api_key"),
         ("huggingface", "Hugging Face", "api_key"),
+        ("aimlapi", "AI/ML API", "api_key"),
         ("zai", "Z.AI / GLM", "api_key"),
         ("kimi-coding", "Kimi / Moonshot", "api_key"),
         ("minimax", "MiniMax", "api_key"),
@@ -93,6 +94,11 @@ class TestProviderRegistry:
         assert pconfig.api_key_env_vars == ("HF_TOKEN",)
         assert pconfig.base_url_env_var == "HF_BASE_URL"
 
+    def test_aimlapi_env_vars(self):
+        pconfig = PROVIDER_REGISTRY["aimlapi"]
+        assert pconfig.api_key_env_vars == ("AIMLAPI_API_KEY",)
+        assert pconfig.base_url_env_var == "AIMLAPI_BASE_URL"
+
     def test_base_urls(self):
         assert PROVIDER_REGISTRY["copilot"].inference_base_url == "https://api.githubcopilot.com"
         assert PROVIDER_REGISTRY["copilot-acp"].inference_base_url == "acp://copilot"
@@ -103,6 +109,7 @@ class TestProviderRegistry:
         assert PROVIDER_REGISTRY["ai-gateway"].inference_base_url == "https://ai-gateway.vercel.sh/v1"
         assert PROVIDER_REGISTRY["kilocode"].inference_base_url == "https://api.kilo.ai/api/gateway"
         assert PROVIDER_REGISTRY["huggingface"].inference_base_url == "https://router.huggingface.co/v1"
+        assert PROVIDER_REGISTRY["aimlapi"].inference_base_url == "https://api.aimlapi.com/v1"
 
     def test_oauth_providers_unchanged(self):
         """Ensure we didn't break the existing OAuth providers."""
@@ -122,6 +129,7 @@ PROVIDER_ENV_VARS = (
     "GLM_API_KEY", "ZAI_API_KEY", "Z_AI_API_KEY",
     "KIMI_API_KEY", "KIMI_BASE_URL", "MINIMAX_API_KEY", "MINIMAX_CN_API_KEY",
     "AI_GATEWAY_API_KEY", "AI_GATEWAY_BASE_URL",
+    "AIMLAPI_API_KEY", "AIMLAPI_BASE_URL",
     "KILOCODE_API_KEY", "KILOCODE_BASE_URL",
     "DASHSCOPE_API_KEY", "OPENCODE_ZEN_API_KEY", "OPENCODE_GO_API_KEY",
     "NOUS_API_KEY", "GITHUB_TOKEN", "GH_TOKEN",
@@ -155,6 +163,9 @@ class TestResolveProvider:
     def test_explicit_ai_gateway(self):
         assert resolve_provider("ai-gateway") == "ai-gateway"
 
+    def test_explicit_aimlapi(self):
+        assert resolve_provider("aimlapi") == "aimlapi"
+
     def test_alias_glm(self):
         assert resolve_provider("glm") == "zai"
 
@@ -178,6 +189,12 @@ class TestResolveProvider:
 
     def test_alias_vercel(self):
         assert resolve_provider("vercel") == "ai-gateway"
+
+    def test_alias_aiml(self):
+        assert resolve_provider("aiml") == "aimlapi"
+
+    def test_alias_ai_ml_api(self):
+        assert resolve_provider("ai-ml-api") == "aimlapi"
 
     def test_explicit_kilocode(self):
         assert resolve_provider("kilocode") == "kilocode"
@@ -249,6 +266,10 @@ class TestResolveProvider:
     def test_auto_detects_ai_gateway_key(self, monkeypatch):
         monkeypatch.setenv("AI_GATEWAY_API_KEY", "test-gw-key")
         assert resolve_provider("auto") == "ai-gateway"
+
+    def test_auto_detects_aimlapi_key(self, monkeypatch):
+        monkeypatch.setenv("AIMLAPI_API_KEY", "test-aiml-key")
+        assert resolve_provider("auto") == "aimlapi"
 
     def test_auto_detects_kilocode_key(self, monkeypatch):
         monkeypatch.setenv("KILOCODE_API_KEY", "test-kilo-key")
@@ -440,6 +461,19 @@ class TestResolveApiKeyProviderCredentials:
         assert creds["api_key"] == "gw-secret-key"
         assert creds["base_url"] == "https://ai-gateway.vercel.sh/v1"
 
+    def test_resolve_aimlapi_with_key(self, monkeypatch):
+        monkeypatch.setenv("AIMLAPI_API_KEY", "aiml-secret-key")
+        creds = resolve_api_key_provider_credentials("aimlapi")
+        assert creds["provider"] == "aimlapi"
+        assert creds["api_key"] == "aiml-secret-key"
+        assert creds["base_url"] == "https://api.aimlapi.com/v1"
+
+    def test_resolve_aimlapi_custom_base_url(self, monkeypatch):
+        monkeypatch.setenv("AIMLAPI_API_KEY", "aiml-key")
+        monkeypatch.setenv("AIMLAPI_BASE_URL", "https://proxy.example.com/v1")
+        creds = resolve_api_key_provider_credentials("aimlapi")
+        assert creds["base_url"] == "https://proxy.example.com/v1"
+
     def test_resolve_kilocode_with_key(self, monkeypatch):
         monkeypatch.setenv("KILOCODE_API_KEY", "kilo-secret-key")
         creds = resolve_api_key_provider_credentials("kilocode")
@@ -524,6 +558,23 @@ class TestRuntimeProviderResolution:
         assert result["api_mode"] == "chat_completions"
         assert result["api_key"] == "gw-key"
         assert "ai-gateway.vercel.sh" in result["base_url"]
+
+    def test_runtime_aimlapi(self, monkeypatch):
+        monkeypatch.setenv("AIMLAPI_API_KEY", "aiml-key")
+        from hermes_cli.runtime_provider import resolve_runtime_provider
+        result = resolve_runtime_provider(requested="aimlapi")
+        assert result["provider"] == "aimlapi"
+        assert result["api_mode"] == "chat_completions"
+        assert result["api_key"] == "aiml-key"
+        assert result["base_url"] == "https://api.aimlapi.com/v1"
+
+    def test_runtime_aimlapi_custom_base_url(self, monkeypatch):
+        monkeypatch.setenv("AIMLAPI_API_KEY", "aiml-key")
+        monkeypatch.setenv("AIMLAPI_BASE_URL", "https://proxy.example.com/v1")
+        from hermes_cli.runtime_provider import resolve_runtime_provider
+        result = resolve_runtime_provider(requested="aimlapi")
+        assert result["provider"] == "aimlapi"
+        assert result["base_url"] == "https://proxy.example.com/v1"
 
     def test_runtime_kilocode(self, monkeypatch):
         monkeypatch.setenv("KILOCODE_API_KEY", "kilo-key")

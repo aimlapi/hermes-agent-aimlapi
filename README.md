@@ -13,7 +13,7 @@
 
 **The self-improving AI agent built by [Nous Research](https://nousresearch.com).** It's the only agent with a built-in learning loop — it creates skills from experience, improves them during use, nudges itself to persist knowledge, searches its own past conversations, and builds a deepening model of who you are across sessions. Run it on a $5 VPS, a GPU cluster, or serverless infrastructure that costs nearly nothing when idle. It's not tied to your laptop — talk to it from Telegram while it works on a cloud VM.
 
-Use any model you want — [Nous Portal](https://portal.nousresearch.com), [OpenRouter](https://openrouter.ai) (200+ models), [z.ai/GLM](https://z.ai), [Kimi/Moonshot](https://platform.moonshot.ai), [MiniMax](https://www.minimax.io), OpenAI, or your own endpoint. Switch with `hermes model` — no code changes, no lock-in.
+Use any model you want — [Nous Portal](https://portal.nousresearch.com), [OpenRouter](https://openrouter.ai) (200+ models), [AI/ML API](https://aimlapi.com/models) (400+ models), [z.ai/GLM](https://z.ai), [Kimi/Moonshot](https://platform.moonshot.ai), [MiniMax](https://www.minimax.io), OpenAI, or your own endpoint. Switch with `hermes model` — no code changes, no lock-in.
 
 <table>
 <tr><td><b>A real terminal interface</b></td><td>Full TUI with multiline editing, slash-command autocomplete, conversation history, interrupt-and-redirect, and streaming tool output.</td></tr>
@@ -61,6 +61,26 @@ hermes doctor       # Diagnose any issues
 ```
 
 📖 **[Full documentation →](https://hermes-agent.nousresearch.com/docs/)**
+
+## AI/ML API
+
+Hermes supports AI/ML API as a first-class provider via its OpenAI-compatible endpoint.
+
+```bash
+export AIMLAPI_API_KEY=your_key_here
+hermes model
+```
+
+Then choose `AI/ML API` and pick a model such as `openai/gpt-5-chat-latest`.
+
+You can also configure it directly in `~/.hermes/config.yaml`:
+
+```yaml
+model:
+  provider: aimlapi
+  base_url: https://api.aimlapi.com/v1
+  default: openai/gpt-5-chat-latest
+```
 
 ## CLI vs Messaging Quick Reference
 

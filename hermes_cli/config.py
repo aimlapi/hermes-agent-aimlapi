@@ -590,6 +590,22 @@ OPTIONAL_ENV_VARS = {
         "category": "provider",
         "advanced": True,
     },
+    "AIMLAPI_API_KEY": {
+        "description": "AI/ML API key (OpenAI-compatible aggregator for 400+ models)",
+        "prompt": "AI/ML API key",
+        "url": "https://aimlapi.com/app/keys",
+        "password": True,
+        "category": "provider",
+        "advanced": True,
+    },
+    "AIMLAPI_BASE_URL": {
+        "description": "AI/ML API base URL override",
+        "prompt": "AI/ML API base URL (leave empty for default)",
+        "url": None,
+        "password": False,
+        "category": "provider",
+        "advanced": True,
+    },
     "GOOGLE_API_KEY": {
         "description": "Google AI Studio API key (also recognized as GEMINI_API_KEY)",
         "prompt": "Google AI Studio API key",

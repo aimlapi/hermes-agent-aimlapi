@@ -197,6 +197,14 @@ PROVIDER_REGISTRY: Dict[str, ProviderConfig] = {
         api_key_env_vars=("AI_GATEWAY_API_KEY",),
         base_url_env_var="AI_GATEWAY_BASE_URL",
     ),
+    "aimlapi": ProviderConfig(
+        id="aimlapi",
+        name="AI/ML API",
+        auth_type="api_key",
+        inference_base_url="https://api.aimlapi.com/v1",
+        api_key_env_vars=("AIMLAPI_API_KEY",),
+        base_url_env_var="AIMLAPI_BASE_URL",
+    ),
     "opencode-zen": ProviderConfig(
         id="opencode-zen",
         name="OpenCode Zen",
@@ -811,6 +819,7 @@ def resolve_provider(
         "google": "gemini", "google-gemini": "gemini", "google-ai-studio": "gemini",
         "kimi": "kimi-coding", "moonshot": "kimi-coding",
         "minimax-china": "minimax-cn", "minimax_cn": "minimax-cn",
+        "aiml": "aimlapi", "ai-ml-api": "aimlapi",
         "claude": "anthropic", "claude-code": "anthropic",
         "github": "copilot", "github-copilot": "copilot",
         "github-models": "copilot", "github-model": "copilot",
