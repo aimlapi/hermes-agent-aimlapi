@@ -144,18 +144,22 @@ _PROVIDER_MODELS: dict[str, list[str]] = {
         "kimi-k2-0905-preview",
     ],
     "minimax": [
-        "MiniMax-M2.7",
-        "MiniMax-M2.7-highspeed",
+        "MiniMax-M1",
+        "MiniMax-M1-40k",
+        "MiniMax-M1-80k",
+        "MiniMax-M1-128k",
+        "MiniMax-M1-256k",
         "MiniMax-M2.5",
-        "MiniMax-M2.5-highspeed",
-        "MiniMax-M2.1",
+        "MiniMax-M2.7",
     ],
     "minimax-cn": [
-        "MiniMax-M2.7",
-        "MiniMax-M2.7-highspeed",
+        "MiniMax-M1",
+        "MiniMax-M1-40k",
+        "MiniMax-M1-80k",
+        "MiniMax-M1-128k",
+        "MiniMax-M1-256k",
         "MiniMax-M2.5",
-        "MiniMax-M2.5-highspeed",
-        "MiniMax-M2.1",
+        "MiniMax-M2.7",
     ],
     "anthropic": [
         "claude-opus-4-6",
@@ -1140,10 +1144,6 @@ def _payload_items(payload: Any) -> list[dict[str, Any]]:
         if isinstance(data, list):
             return [item for item in data if isinstance(item, dict)]
     return []
-
-
-def _extract_model_ids(payload: Any) -> list[str]:
-    return [item.get("id", "") for item in _payload_items(payload) if item.get("id")]
 
 
 def copilot_default_headers() -> dict[str, str]:

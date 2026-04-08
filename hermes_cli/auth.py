@@ -37,7 +37,7 @@ from typing import Any, Dict, List, Optional
 import httpx
 import yaml
 
-from hermes_cli.config import get_hermes_home, get_config_path
+from hermes_cli.config import get_hermes_home, get_config_path, read_raw_config
 from hermes_constants import OPENROUTER_BASE_URL
 
 logger = logging.getLogger(__name__)
@@ -2223,14 +2223,7 @@ def _update_config_for_provider(
     config_path = get_config_path()
     config_path.parent.mkdir(parents=True, exist_ok=True)
 
-    config: Dict[str, Any] = {}
-    if config_path.exists():
-        try:
-            loaded = yaml.safe_load(config_path.read_text()) or {}
-            if isinstance(loaded, dict):
-                config = loaded
-        except Exception:
-            config = {}
+    config = read_raw_config()
 
     current_model = config.get("model")
     if isinstance(current_model, dict):
@@ -2267,12 +2260,8 @@ def _reset_config_provider() -> Path:
     if not config_path.exists():
         return config_path
 
-    try:
-        config = yaml.safe_load(config_path.read_text()) or {}
-    except Exception:
-        return config_path
-
-    if not isinstance(config, dict):
+    config = read_raw_config()
+    if not config:
         return config_path
 
     model = config.get("model")
@@ -2848,7 +2837,6 @@ def _login_nous(args, pconfig: ProviderConfig) -> None:
         )
 
         inference_base_url = auth_state["inference_base_url"]
-        verify: bool | str = False if insecure else (ca_bundle if ca_bundle else True)
 
         with _auth_store_lock():
             auth_store = _load_auth_store()
