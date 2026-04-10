@@ -948,7 +948,7 @@ def select_provider_and_model(args=None):
     top_providers = [
         ("nous", "Nous Portal (Nous Research subscription)"),
         ("openrouter", "OpenRouter (100+ models, pay-per-use)"),
-        ("aimlapi", "AI/ML API (400+ models, OpenAI-compatible aggregator)"),
+        ("aimlapi", "AI/ML API (300+ models, OpenAI-compatible aggregator)"),
         ("anthropic", "Anthropic (Claude models — API key or Claude Code)"),
         ("openai-codex", "OpenAI Codex"),
         ("qwen-oauth", "Qwen OAuth (reuses local Qwen CLI login)"),

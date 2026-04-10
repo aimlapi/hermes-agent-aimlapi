@@ -660,7 +660,7 @@ OPTIONAL_ENV_VARS = {
         "advanced": True,
     },
     "AIMLAPI_API_KEY": {
-        "description": "AI/ML API key (OpenAI-compatible aggregator for 400+ models)",
+        "description": "AI/ML API key (OpenAI-compatible aggregator for 300+ models)",
         "prompt": "AI/ML API key",
         "url": "https://aimlapi.com/app/keys",
         "password": True,
