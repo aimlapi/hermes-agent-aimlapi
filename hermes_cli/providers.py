@@ -58,6 +58,12 @@ HERMES_OVERLAYS: Dict[str, HermesOverlay] = {
         auth_type="oauth_external",
         base_url_override="https://chatgpt.com/backend-api/codex",
     ),
+    "qwen-oauth": HermesOverlay(
+        transport="openai_chat",
+        auth_type="oauth_external",
+        base_url_override="https://portal.qwen.ai/v1",
+        base_url_env_var="HERMES_QWEN_BASE_URL",
+    ),
     "copilot-acp": HermesOverlay(
         transport="codex_responses",
         auth_type="external_process",
@@ -148,10 +154,6 @@ class ProviderDef:
     auth_type: str = "api_key"
     doc: str = ""
     source: str = ""                      # "models.dev", "hermes", "user-config"
-
-    @property
-    def is_user_defined(self) -> bool:
-        return self.source == "user-config"
 
 
 # -- Aliases ------------------------------------------------------------------
@@ -264,12 +266,6 @@ def normalize_provider(name: str) -> str:
     """
     key = name.strip().lower()
     return ALIASES.get(key, key)
-
-
-def get_overlay(provider_id: str) -> Optional[HermesOverlay]:
-    """Get Hermes overlay for a provider, if one exists."""
-    canonical = normalize_provider(provider_id)
-    return HERMES_OVERLAYS.get(canonical)
 
 
 def get_provider(name: str) -> Optional[ProviderDef]:
@@ -457,9 +453,64 @@ def resolve_user_provider(name: str, user_config: Dict[str, Any]) -> Optional[Pr
     )
 
 
+def custom_provider_slug(display_name: str) -> str:
+    """Build a canonical slug for a custom_providers entry.
+
+    Matches the convention used by runtime_provider and credential_pool
+    (``custom:<normalized-name>``).  Centralised here so all call-sites
+    produce identical slugs.
+    """
+    return "custom:" + display_name.strip().lower().replace(" ", "-")
+
+
+def resolve_custom_provider(
+    name: str,
+    custom_providers: Optional[List[Dict[str, Any]]],
+) -> Optional[ProviderDef]:
+    """Resolve a provider from the user's config.yaml ``custom_providers`` list."""
+    if not custom_providers or not isinstance(custom_providers, list):
+        return None
+
+    requested = (name or "").strip().lower()
+    if not requested:
+        return None
+
+    for entry in custom_providers:
+        if not isinstance(entry, dict):
+            continue
+
+        display_name = (entry.get("name") or "").strip()
+        api_url = (
+            entry.get("base_url", "")
+            or entry.get("url", "")
+            or entry.get("api", "")
+            or ""
+        ).strip()
+        if not display_name or not api_url:
+            continue
+
+        slug = custom_provider_slug(display_name)
+        if requested not in {display_name.lower(), slug}:
+            continue
+
+        return ProviderDef(
+            id=slug,
+            name=display_name,
+            transport="openai_chat",
+            api_key_env_vars=(),
+            base_url=api_url,
+            is_aggregator=False,
+            auth_type="api_key",
+            source="user-config",
+        )
+
+    return None
+
+
 def resolve_provider_full(
     name: str,
     user_providers: Optional[Dict[str, Any]] = None,
+    custom_providers: Optional[List[Dict[str, Any]]] = None,
 ) -> Optional[ProviderDef]:
     """Full resolution chain: built-in → models.dev → user config.
 
@@ -468,6 +519,7 @@ def resolve_provider_full(
     Args:
         name: Provider name or alias.
         user_providers: The ``providers:`` dict from config.yaml (optional).
+        custom_providers: The ``custom_providers:`` list from config.yaml (optional).
 
     Returns:
         ProviderDef if found, else None.
@@ -489,6 +541,11 @@ def resolve_provider_full(
         user_pdef = resolve_user_provider(name.strip().lower(), user_providers)
         if user_pdef is not None:
             return user_pdef
+
+    # 2b. Saved custom providers from config
+    custom_pdef = resolve_custom_provider(name, custom_providers)
+    if custom_pdef is not None:
+        return custom_pdef
 
     # 3. Try models.dev directly (for providers not in our ALIASES)
     try:
