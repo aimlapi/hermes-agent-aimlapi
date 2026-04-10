@@ -285,6 +285,50 @@ class TestFetchApiModels:
         assert catalog is not None
         assert [item["id"] for item in catalog] == ["gpt-5.4"]
 
+    def test_probe_api_models_filters_aimlapi_to_chat_completion(self):
+        class _Resp:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+            def read(self):
+                return (
+                    b'{"data":['
+                    b'{"id":"openai/gpt-4o","type":"chat-completion"},'
+                    b'{"id":"openai/text-embedding-3-large","type":"embedding"},'
+                    b'{"id":"stability/sdxl","type":"image-generation"}'
+                    b']}'
+                )
+
+        with patch("hermes_cli.models.urllib.request.urlopen", return_value=_Resp()):
+            probe = probe_api_models("aiml-key", "https://api.aimlapi.com/v1", provider="aimlapi")
+
+        assert probe["models"] == ["openai/gpt-4o"]
+
+    def test_fetch_api_models_filters_aimlapi_to_chat_completion(self):
+        class _Resp:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+            def read(self):
+                return (
+                    b'{"data":['
+                    b'{"id":"openai/gpt-4o","type":"chat-completion"},'
+                    b'{"id":"anthropic/claude-sonnet-4.6","type":"chat-completion"},'
+                    b'{"id":"openai/text-embedding-3-small","type":"embedding"}'
+                    b']}'
+                )
+
+        with patch("hermes_cli.models.urllib.request.urlopen", return_value=_Resp()):
+            models = fetch_api_models("aiml-key", "https://api.aimlapi.com/v1", provider="aimlapi")
+
+        assert models == ["openai/gpt-4o", "anthropic/claude-sonnet-4.6"]
+
 
 class TestGithubReasoningEfforts:
     def test_gpt5_supports_minimal_to_high(self):

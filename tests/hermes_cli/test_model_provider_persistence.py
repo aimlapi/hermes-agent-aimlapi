@@ -257,3 +257,23 @@ class TestProviderPersistsAfterModelSave:
         assert model.get("provider") == "opencode-go"
         assert model.get("default") == "minimax-m2.5"
         assert model.get("api_mode") == "anthropic_messages"
+
+    def test_aimlapi_onboarding_does_not_prompt_for_base_url(self, config_home, monkeypatch):
+        from hermes_cli.main import _model_flow_api_key_provider
+        from hermes_cli.config import load_config
+
+        monkeypatch.setenv("AIMLAPI_API_KEY", "aiml-test-key")
+
+        with patch("hermes_cli.models.fetch_api_models", return_value=["openai/gpt-4o"]), \
+             patch("hermes_cli.auth._prompt_model_selection", return_value="openai/gpt-4o"), \
+             patch("hermes_cli.auth.deactivate_provider"), \
+             patch("builtins.input", side_effect=AssertionError("base URL prompt should not be shown for aimlapi")):
+            _model_flow_api_key_provider(load_config(), "aimlapi", "old-model")
+
+        import yaml
+        config = yaml.safe_load((config_home / "config.yaml").read_text()) or {}
+        model = config.get("model")
+        assert isinstance(model, dict)
+        assert model.get("provider") == "aimlapi"
+        assert model.get("base_url") == "https://api.aimlapi.com/v1"
+        assert model.get("default") == "openai/gpt-4o"
