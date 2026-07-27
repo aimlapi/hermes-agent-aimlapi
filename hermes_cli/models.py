@@ -1077,6 +1077,7 @@ class ProviderEntry(NamedTuple):
 
 CANONICAL_PROVIDERS: list[ProviderEntry] = [
     ProviderEntry("nous",           "Nous Portal",              "Nous Portal (Everything your agent needs, 300+ models with bundled tool use)"),
+    ProviderEntry("aimlapi",        "aimlapi.com",               "aimlapi.com (1000+ models, one-click setup)"),
     ProviderEntry("fireworks",      "Fireworks AI",             "Fireworks AI (OpenAI-compatible direct model API)"),
     ProviderEntry("openrouter",     "OpenRouter",               "OpenRouter (Pay-per-use API aggregator)"),
     ProviderEntry("moa",            "Mixture of Agents",        "Mixture of Agents (named presets; aggregator acts after reference models)"),
@@ -1791,7 +1792,7 @@ def _resolve_nous_pricing_credentials() -> tuple[str, str]:
 
 
 def get_pricing_for_provider(provider: str, *, force_refresh: bool = False) -> dict[str, dict[str, str]]:
-    """Return live pricing for providers that support it (openrouter, nous, novita)."""
+    """Return live pricing for providers that support it."""
     normalized = normalize_provider(provider)
     if normalized == "openrouter":
         return fetch_models_with_pricing(
@@ -1820,6 +1821,14 @@ def get_pricing_for_provider(provider: str, *, force_refresh: bool = False) -> d
                 # Sale chrome (pricing.original) is Nous Portal-only.
                 include_sale_original=True,
             )
+    try:
+        from providers import get_provider_profile
+
+        profile = get_provider_profile(normalized)
+        if profile is not None:
+            return profile.fetch_model_pricing(force_refresh=force_refresh)
+    except Exception:
+        pass
     return {}
 
 

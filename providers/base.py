@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Callable
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +55,12 @@ class ProviderProfile:
     models_url: str = ""  # explicit models endpoint; falls back to {base_url}/models
     auth_type: str = "api_key"   # api_key|oauth_device_code|oauth_external|copilot|aws_sdk
     supports_health_check: bool = True  # False → doctor skips /models probe for this provider
+    allow_base_url_override: bool = True
+
+    # Optional interactive API-key acquisition hook supplied by a provider
+    # plugin. The core setup flow owns prompting and persistence; the plugin
+    # returns a key or None when its guided flow does not complete.
+    guided_api_key_setup: Callable[[str], str | None] | None = None
 
     # ── Vision support ────────────────────────────────────────
     # True when the provider's API accepts image content inside
@@ -76,6 +82,7 @@ class ProviderProfile:
     # fallback_models: curated list shown in /model picker when live fetch fails.
     # Only agentic models that support tool calling should appear here.
     fallback_models: tuple = ()
+    prefer_live_model_discovery: bool = False
 
     # hostname: base hostname for URL→provider reverse-mapping in model_metadata.py
     # e.g. "api.gmi-serving.com". Derived from base_url when empty.
@@ -230,3 +237,13 @@ class ProviderProfile:
         except Exception as exc:
             logger.debug("fetch_models(%s): %s", self.name, exc)
             return None
+
+    def fetch_model_pricing(
+        self,
+        *,
+        base_url: str | None = None,
+        timeout: float = 8.0,
+        force_refresh: bool = False,
+    ) -> dict[str, dict[str, str]]:
+        """Return picker pricing keyed by model ID when the provider exposes it."""
+        return {}

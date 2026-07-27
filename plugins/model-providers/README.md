@@ -61,6 +61,31 @@ Nothing else needs to change. `auth.py`, `config.py`, `models.py`,
 `doctor.py`, `model_metadata.py`, `runtime_provider.py`, and the
 chat_completions transport all auto-wire from the registry.
 
+## Guided API-key setup
+
+Provider plugins may offer an interactive key-acquisition flow without adding
+vendor-specific branches to the Hermes CLI:
+
+```python
+def guided_setup(existing_key: str) -> str | None:
+    # Run the provider-owned browser/device flow and return the issued key.
+    ...
+
+my_provider = ProviderProfile(
+    name="your-provider",
+    env_vars=("YOUR_PROVIDER_API_KEY",),
+    base_url="https://api.your-provider.example.com/v1",
+    guided_api_key_setup=guided_setup,
+    allow_base_url_override=False,
+    prefer_live_model_discovery=True,
+)
+```
+
+Hermes persists a returned key through its normal secret-storage path. The
+plugin owns its provider-specific credential choice, authentication,
+cancellation, and error handling. `prefer_live_model_discovery` uses the
+profile's `fetch_models()` hook first and falls back to `fallback_models`.
+
 ## Non-trivial profiles
 
 Override the `ProviderProfile` hooks in a subclass for per-provider
