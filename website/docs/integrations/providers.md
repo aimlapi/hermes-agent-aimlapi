@@ -15,6 +15,7 @@ You need at least one way to connect to an LLM. Use `hermes model` to switch pro
 | Provider | Setup |
 |----------|-------|
 | **Nous Portal** | `hermes model` (OAuth, subscription-based) |
+| **aimlapi.com** | `hermes model` (1000+ models, one-click setup; provider: `aimlapi`) |
 | **OpenAI Codex** | `hermes model` → **ChatGPT or Codex Subscription** (ChatGPT OAuth, uses Codex models) |
 | **GitHub Copilot** | `hermes model` (OAuth device code flow, `COPILOT_GITHUB_TOKEN`, `GH_TOKEN`, or `gh auth token`) |
 | **GitHub Copilot ACP** | `hermes model` (spawns local `copilot --acp --stdio`) |
@@ -56,7 +57,22 @@ You need at least one way to connect to an LLM. Use `hermes model` to switch pro
 | **LM Studio** | `hermes model` → "LM Studio" (provider: `lmstudio`, optional `LM_API_KEY`) |
 | **Custom Endpoint** | `hermes model` → choose "Custom endpoint" (saved in `config.yaml`) |
 
-For the official API-key path, see the dedicated [Google Gemini guide](/guides/google-gemini).
+For the official Google API-key path, see the dedicated
+[Google Gemini guide](/guides/google-gemini).
+
+### AI/ML API
+
+Select **aimlapi.com** in `hermes model`, then use the guided email flow and
+browser checkout or paste an existing API key. Hermes stores the resulting
+`AIMLAPI_API_KEY` through its normal credential path and uses the fixed
+OpenAI-compatible endpoint. Production endpoints are the defaults; local
+staging tests use the documented `AIMLAPI_*_URL` overrides.
+
+The provider shows a curated hottest-model list first, then appends compatible
+chat/tool models from the live catalog. The model picker also shows live
+input, output, and cache-read prices per million tokens when the catalog
+publishes them. The first integration version does not query account balance
+during setup.
 
 :::tip Model key alias
 In the `model:` config section, you can use either `default:` or `model:` as the key name for your model ID. Both `model: { default: my-model }` and `model: { model: my-model }` work identically.

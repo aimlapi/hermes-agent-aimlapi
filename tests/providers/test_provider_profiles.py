@@ -219,5 +219,16 @@ class TestQwenProfile:
         assert "metadata" not in eb
 
 
+class TestBaseProfile:
+    def test_setup_hook_defaults(self):
+        p = ProviderProfile(name="test")
+        assert p.allow_base_url_override is True
+        assert p.guided_api_key_setup is None
+        assert p.prefer_live_model_discovery is False
+
+    def test_prepare_messages_passthrough(self):
+        p = ProviderProfile(name="test")
+        msgs = [{"role": "user", "content": "hi"}]
+        assert p.prepare_messages(msgs) is msgs
 
 
