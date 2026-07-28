@@ -181,6 +181,26 @@ def guided_api_key_setup(existing_key: str = "") -> str | None:
                     "aimlapi.com key."
                 )
                 return None
+            client = AimlapiClient(resolve_endpoints())
+            try:
+                client.validate_api_key(api_key)
+            except APIError as exc:
+                _debug("validating pasted API key", exc)
+                if exc.status in {401, 403}:
+                    print(color("The aimlapi.com key is invalid or revoked.", Colors.RED))
+                else:
+                    print(
+                        color(
+                            "The aimlapi.com key could not be validated. "
+                            "Please try again.",
+                            Colors.RED,
+                        )
+                    )
+                if existing_key.strip():
+                    print("Your previously saved key was not changed.")
+                else:
+                    print("No API key was saved.")
+                return None
             print("Everything is ready.")
             return api_key
 
