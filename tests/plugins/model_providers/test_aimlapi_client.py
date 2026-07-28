@@ -95,6 +95,8 @@ def test_auth_and_checkout_requests_always_send_attribution_headers(monkeypatch)
             return _Response({"token": "auth-token"})
         if path.endswith("/v1/auth/account/passwordless"):
             return _Response({"token": "auth-token"})
+        if path.endswith("/v2/billing"):
+            return _Response({})
         if path.endswith("/v3/partner-checkout/sessions"):
             return _Response({"sessionToken": "checkout-token"})
         if path.endswith("/v3/partner-checkout/sessions/checkout-token/pay"):
@@ -111,6 +113,7 @@ def test_auth_and_checkout_requests_always_send_attribution_headers(monkeypatch)
     client = _trusted_client()
 
     assert client.check_account("user@example.com") == "sign-in"
+    client.validate_api_key("existing-key")
     client.send_sign_in_code("user@example.com")
     assert client.verify_sign_in_code("user@example.com", "123456") == "auth-token"
     assert client.create_passwordless_account("new@example.com") == "auth-token"
@@ -128,10 +131,16 @@ def test_auth_and_checkout_requests_always_send_attribution_headers(monkeypatch)
     )
     assert client.exchange_checkout("auth-token", "checkout-token") == "issued-key"
 
-    assert len(captured) == 8
+    assert len(captured) == 9
     for request in captured:
         assert request.get_header("X-aimlapi-source") == "agent/hermes-agent"
         assert request.get_header("X-aimlapi-partner-id") == DEFAULT_PARTNER_ID
+
+    validation_request = next(
+        request for request in captured if request.full_url.endswith("/v2/billing")
+    )
+    assert validation_request.full_url == "https://api.aimlapi.com/v2/billing"
+    assert validation_request.get_header("Authorization") == "Bearer existing-key"
 
 
 def test_create_checkout_session_uses_app_return_url(monkeypatch):

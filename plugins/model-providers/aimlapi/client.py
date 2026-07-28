@@ -112,6 +112,19 @@ class AimlapiClient:
             raise APIError("aimlapi.com returned an unsupported account action")
         return action
 
+    def validate_api_key(self, api_key: str) -> None:
+        inference_base = self.endpoints.inference_base_url.strip().rstrip("/")
+        billing_base = (
+            inference_base[: -len("/v1")]
+            if inference_base.endswith("/v1")
+            else inference_base
+        )
+        self._request(
+            "GET",
+            self._endpoint(billing_base, "/v2/billing"),
+            bearer=api_key,
+        )
+
     def send_sign_in_code(self, email: str) -> None:
         self._request(
             "POST",

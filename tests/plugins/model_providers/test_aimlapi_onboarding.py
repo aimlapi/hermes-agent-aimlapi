@@ -96,8 +96,21 @@ def test_saved_key_can_be_reused_without_network_or_balance_check(monkeypatch, c
     assert "Everything is ready." in capsys.readouterr().out
 
 
-def test_existing_key_can_be_pasted_without_balance_check(monkeypatch, capsys):
+def test_existing_key_is_validated_and_accepted_without_balance_check(
+    monkeypatch,
+    capsys,
+):
+    validated = []
+
+    class ValidatingClient:
+        def __init__(self, _endpoints):
+            pass
+
+        def validate_api_key(self, api_key):
+            validated.append(api_key)
+
     monkeypatch.setattr(onboarding_module, "_prompt_choice", lambda *_args: 1)
+    monkeypatch.setattr(onboarding_module, "AimlapiClient", ValidatingClient)
     monkeypatch.setattr(
         onboarding_module.getpass,
         "getpass",
@@ -105,7 +118,43 @@ def test_existing_key_can_be_pasted_without_balance_check(monkeypatch, capsys):
     )
 
     assert guided_api_key_setup("") == "pasted-key"
+    assert validated == ["pasted-key"]
     assert "Everything is ready." in capsys.readouterr().out
+
+
+def test_invalid_pasted_key_is_rejected_and_saved_key_is_unchanged(
+    monkeypatch,
+    capsys,
+):
+    class RejectingClient:
+        def __init__(self, _endpoints):
+            pass
+
+        def validate_api_key(self, _api_key):
+            raise APIError("authentication was rejected", status=401)
+
+    choices = iter((1, 1))
+    monkeypatch.setattr(
+        onboarding_module,
+        "_prompt_choice",
+        lambda *_args: next(choices),
+    )
+    monkeypatch.setattr(onboarding_module, "AimlapiClient", RejectingClient)
+    monkeypatch.setattr(
+        onboarding_module.getpass,
+        "getpass",
+        lambda _prompt: "not-a-real-key",
+    )
+    monkeypatch.setattr(
+        onboarding_module,
+        "color",
+        lambda text, code: f"<{code}>{text}</>",
+    )
+
+    assert guided_api_key_setup("saved-key") is None
+    output = capsys.readouterr().out
+    assert "The aimlapi.com key is invalid or revoked." in output
+    assert "Your previously saved key was not changed." in output
 
 
 def test_new_account_checkout_matches_canonical_flow(monkeypatch, capsys):
@@ -175,8 +224,16 @@ def test_amount_reprompts_for_non_finite_and_below_minimum(monkeypatch, capsys):
 
 
 def test_invalid_email_is_printed_in_red(monkeypatch, capsys):
+    answers = iter(("not-an-email",))
+
+    def prompt_email(_prompt):
+        try:
+            return next(answers)
+        except StopIteration as exc:
+            raise EOFError from exc
+
     monkeypatch.setattr(onboarding_module, "_prompt_choice", lambda *_args: 0)
-    monkeypatch.setattr("builtins.input", lambda _prompt: "not-an-email")
+    monkeypatch.setattr("builtins.input", prompt_email)
     monkeypatch.setattr(
         onboarding_module,
         "color",
@@ -185,7 +242,8 @@ def test_invalid_email_is_printed_in_red(monkeypatch, capsys):
 
     assert guided_api_key_setup("") is None
     assert (
-        f"<{onboarding_module.Colors.RED}>Email format is incorrect.</>"
+        f"<{onboarding_module.Colors.RED}>  "
+        "Email format is incorrect. Please try again.</>"
         in capsys.readouterr().out
     )
 
