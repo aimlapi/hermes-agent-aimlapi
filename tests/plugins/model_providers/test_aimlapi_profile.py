@@ -33,7 +33,7 @@ class _Response:
         return self._payload
 
 
-def test_live_catalog_keeps_only_tool_capable_chat_models(monkeypatch):
+def test_live_catalog_keeps_hottest_chat_and_tool_capable_models(monkeypatch):
     captured = {}
     payload = {
         "data": [
@@ -72,10 +72,14 @@ def test_live_catalog_keeps_only_tool_capable_chat_models(monkeypatch):
 
     assert aimlapi.fetch_models(api_key="key") == [
         "anthropic/claude-fable-5",
+        "chat-only",
         "tool-model",
     ]
     assert captured["request"].get_header("X-aimlapi-partner-id")
-    assert captured["request"].get_header("X-aimlapi-source") == "agent"
+    assert (
+        captured["request"].get_header("X-aimlapi-source")
+        == "agent/hermes-agent"
+    )
     assert captured["request"].get_header("User-agent") == "hermes-cli"
     assert captured["request"].get_header("Authorization") is None
     assert "include=capabilities,pricing" in captured["request"].full_url
@@ -151,6 +155,8 @@ def test_runtime_headers_are_gated_by_endpoint():
     _, trusted = aimlapi.build_api_kwargs_extras(base_url="https://api.aimlapi.com/v1")
     _, untrusted = aimlapi.build_api_kwargs_extras(base_url="https://proxy.example/v1")
 
+    assert trusted["extra_headers"]["X-AIMLAPI-Source"] == "agent/hermes-agent"
+    assert trusted["extra_headers"]["X-AIMLAPI-Partner-ID"]
     assert trusted["extra_headers"]["X-AIMLAPI-Integration-Version"] == "1.0.0"
     assert untrusted == {}
 
@@ -161,9 +167,10 @@ def test_plugin_uses_fixed_endpoint_and_guided_setup():
     assert aimlapi.guided_api_key_setup is not None
     assert aimlapi.display_name == "aimlapi.com"
     assert aimlapi.description == "aimlapi.com (1000+ models, one-click setup)"
+    assert aimlapi.default_aux_model == "anthropic/claude-sonnet-5"
     assert aimlapi.fallback_models[:4] == (
-        "anthropic/claude-fable-5",
-        "anthropic/claude-opus-4.8",
-        "anthropic/claude-opus-4.8-fast",
         "anthropic/claude-sonnet-5",
+        "openai/gpt-5.6-luna-pro",
+        "openai/gpt-5.6-terra-pro",
+        "openai/gpt-5.6-sol-pro",
     )

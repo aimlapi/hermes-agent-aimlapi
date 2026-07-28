@@ -87,7 +87,7 @@ def test_attribution_contract_has_no_tolt_fields(monkeypatch):
     headers = attribution_headers()
 
     assert headers == {
-        "X-AIMLAPI-Source": "agent",
+        "X-AIMLAPI-Source": "agent/hermes-agent",
         "X-AIMLAPI-Partner-ID": "part_staging",
         "X-AIMLAPI-Integration-Repo": "NousResearch/hermes-agent",
         "X-AIMLAPI-Integration-Version": "1.0.0",

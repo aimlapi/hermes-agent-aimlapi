@@ -1,4 +1,4 @@
-"""AI/ML API model-provider plugin for Hermes Agent."""
+"""aimlapi.com model-provider plugin for Hermes Agent."""
 
 from __future__ import annotations
 
@@ -23,22 +23,22 @@ from .onboarding import guided_api_key_setup
 logger = logging.getLogger(__name__)
 
 HOTTEST_MODELS = (
-    "anthropic/claude-fable-5",
-    "anthropic/claude-opus-4.8",
-    "anthropic/claude-opus-4.8-fast",
     DEFAULT_MODEL,
-    "openai/gpt-5.6-sol-pro",
-    "openai/gpt-5.6-terra-pro",
     "openai/gpt-5.6-luna-pro",
-    "x-ai/grok-4-5",
+    "openai/gpt-5.6-terra-pro",
+    "openai/gpt-5.6-sol-pro",
+    "anthropic/claude-fable-5",
+    "anthropic/claude-opus-5",
     "deepseek/deepseek-v4-pro",
     "google/gemini-3.6-flash",
+    "google/gemini-3-6-flash",
+    "zhipu/glm-5.2",
+    "zhipu/glm-5-2",
     "alibaba/glm-5.2",
     "alibaba/qwen3.7-max",
-    "zhipu/glm-5-2",
     "minimax/minimax-m3",
     "moonshot/kimi-k3",
-    "zhipu/glm-5.2",
+    "x-ai/grok-4-5",
 )
 
 CURATED_MODELS = HOTTEST_MODELS + (
@@ -131,10 +131,15 @@ class AimlapiProfile(ProviderProfile):
             model_id = str(entry.get("id") or "").strip()
             capabilities = entry.get("capabilities")
             supports_tools = isinstance(capabilities, list) and "tools" in capabilities
-            if not model_id or model_id in seen or not supports_tools:
-                continue
             info = entry.get("info")
-            if isinstance(info, dict) and info.get("isHottest") is True:
+            is_hottest = isinstance(info, dict) and info.get("isHottest") is True
+            if (
+                not model_id
+                or model_id in seen
+                or (not is_hottest and not supports_tools)
+            ):
+                continue
+            if is_hottest:
                 hottest.append(model_id)
             else:
                 models.append(model_id)

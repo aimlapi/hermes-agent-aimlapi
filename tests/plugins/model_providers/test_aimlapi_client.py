@@ -28,6 +28,22 @@ class _Handler(BaseHTTPRequestHandler):
         return
 
 
+class _Response:
+    status = 200
+
+    def __init__(self, payload):
+        self._payload = json.dumps(payload).encode() if payload is not None else b""
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_args):
+        return False
+
+    def read(self, _limit=-1):
+        return self._payload
+
+
 def _trusted_client():
     return AimlapiClient(
         Endpoints(
@@ -59,10 +75,63 @@ def test_client_sends_bearer_and_attribution_headers():
     assert key == "issued-key"
     headers = _Handler.request_headers
     assert headers["Authorization"] == "Bearer secret-key"
-    assert headers["X-AIMLAPI-Source"] == "agent"
+    assert headers["X-AIMLAPI-Source"] == "agent/hermes-agent"
     assert headers["X-AIMLAPI-Partner-ID"] == DEFAULT_PARTNER_ID
     assert headers["X-AIMLAPI-Integration-Repo"] == "NousResearch/hermes-agent"
     assert headers["X-AIMLAPI-Integration-Version"] == "1.0.0"
+
+
+def test_auth_and_checkout_requests_always_send_attribution_headers(monkeypatch):
+    captured = []
+
+    def fake_urlopen(request, timeout):
+        captured.append(request)
+        path = request.full_url
+        if path.endswith("/v1/auth/account"):
+            return _Response({"action": "sign-in"})
+        if path.endswith("/v1/auth/sign-in/code"):
+            return _Response(None)
+        if path.endswith("/v1/auth/sign-in/code/verify"):
+            return _Response({"token": "auth-token"})
+        if path.endswith("/v1/auth/account/passwordless"):
+            return _Response({"token": "auth-token"})
+        if path.endswith("/v3/partner-checkout/sessions"):
+            return _Response({"sessionToken": "checkout-token"})
+        if path.endswith("/v3/partner-checkout/sessions/checkout-token/pay"):
+            return _Response(
+                {"checkout": {"payUrl": "https://staging-pay.aimlapi.com/checkout"}}
+            )
+        if path.endswith("/v3/partner-checkout/sessions/checkout-token/exchange"):
+            return _Response({"apiKey": "issued-key"})
+        if path.endswith("/v3/partner-checkout/sessions/checkout-token"):
+            return _Response({"status": "pending"})
+        raise AssertionError(f"unexpected request: {request.method} {path}")
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+    client = _trusted_client()
+
+    assert client.check_account("user@example.com") == "sign-in"
+    client.send_sign_in_code("user@example.com")
+    assert client.verify_sign_in_code("user@example.com", "123456") == "auth-token"
+    assert client.create_passwordless_account("new@example.com") == "auth-token"
+    assert client.create_checkout_session() == "checkout-token"
+    assert client.get_checkout_session("checkout-token") == {"status": "pending"}
+    assert (
+        client.start_checkout(
+            "auth-token",
+            "checkout-token",
+            2500,
+            "payment-id",
+            True,
+        )
+        == "https://staging-pay.aimlapi.com/checkout"
+    )
+    assert client.exchange_checkout("auth-token", "checkout-token") == "issued-key"
+
+    assert len(captured) == 8
+    for request in captured:
+        assert request.get_header("X-aimlapi-source") == "agent/hermes-agent"
+        assert request.get_header("X-aimlapi-partner-id") == DEFAULT_PARTNER_ID
 
 
 def test_create_checkout_session_uses_app_return_url(monkeypatch):
@@ -115,7 +184,12 @@ def test_passwordless_signup_sends_staging_invite_code(monkeypatch):
 
 def test_checkout_poll_retries_transient_failure(monkeypatch):
     client = _trusted_client()
-    outcomes = iter((APIError("temporary", status=503), {"status": "paid"}))
+    outcomes = iter(
+        (
+            APIError("temporary", status=503),
+            {"status": "paid", "sessionToken": "paid-session"},
+        )
+    )
 
     def get_session(_token):
         outcome = next(outcomes)
@@ -125,7 +199,18 @@ def test_checkout_poll_retries_transient_failure(monkeypatch):
 
     monkeypatch.setattr(client, "get_checkout_session", get_session)
 
-    assert client.wait_for_checkout("session", poll_interval=0) == "paid"
+    assert client.wait_for_checkout("session", poll_interval=0) == "paid-session"
+
+
+def test_checkout_poll_keeps_original_token_when_response_omits_it(monkeypatch):
+    client = _trusted_client()
+    monkeypatch.setattr(
+        client,
+        "get_checkout_session",
+        lambda _token: {"status": "paid"},
+    )
+
+    assert client.wait_for_checkout("session", poll_interval=0) == "session"
 
 
 @pytest.mark.parametrize("status", ("cancelled", "expired", "failed"))

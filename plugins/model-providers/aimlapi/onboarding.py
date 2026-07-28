@@ -1,4 +1,4 @@
-"""Interactive AI/ML API key acquisition flow for Hermes Agent."""
+"""Interactive aimlapi.com key acquisition flow for Hermes Agent."""
 
 from __future__ import annotations
 
@@ -7,7 +7,10 @@ import math
 import os
 import re
 import sys
+import time
 import webbrowser
+
+from hermes_cli.colors import Colors, color
 
 from .client import APIError, AimlapiClient
 from .config import (
@@ -28,16 +31,30 @@ def _debug(stage: str, error: Exception) -> None:
         "on",
     }:
         return
-    print(f"  [AI/ML API debug] {stage}: {error}", file=sys.stderr)
+    print(f"  [aimlapi.com debug] {stage}: {error}", file=sys.stderr)
 
 
 def _retry_idempotent(call):
+    retry_delays = (1.0, 2.0, 4.0, 8.0)
+    for attempt in range(len(retry_delays) + 1):
+        try:
+            return call()
+        except APIError as exc:
+            retryable = exc.status == 404 or not exc.status or exc.status >= 500
+            if not retryable or attempt == len(retry_delays):
+                raise
+            time.sleep(retry_delays[attempt])
+    raise RuntimeError("unreachable")
+
+
+def _prompt_prefilled(label: str, default: str) -> str:
+    if not sys.stdin.isatty() or not sys.stdout.isatty():
+        return input(f"{label}{default}").strip() or default
     try:
-        return call()
-    except APIError as exc:
-        if exc.status and exc.status < 500:
-            raise
-        return call()
+        from prompt_toolkit import prompt
+    except ImportError:
+        return input(f"{label}{default}").strip() or default
+    return prompt(label, default=default).strip()
 
 
 def _prompt_amount() -> int | None:
@@ -48,7 +65,7 @@ def _prompt_amount() -> int | None:
     print(f"  Add credits (min ${minimum:.0f}).")
     while True:
         try:
-            raw = input(f"  Amount [{default_usd:.0f}]: ").strip()
+            raw = _prompt_prefilled("  Amount: ", f"{default_usd:.0f}")
         except (KeyboardInterrupt, EOFError):
             print()
             return None
@@ -109,9 +126,9 @@ def _open_and_wait(
     client: AimlapiClient,
     session_token: str,
     checkout_url: str,
-) -> None:
+) -> str:
     print()
-    print("  Opening checkout in browser...")
+    print(color("  Opening checkout in browser...", Colors.YELLOW))
     print(
         "  If the browser did not open automatically please use this link "
         "to top up your account:"
@@ -124,7 +141,7 @@ def _open_and_wait(
     except Exception:
         pass
     print("  Waiting for payment confirmation. Press Ctrl+C to cancel.")
-    client.wait_for_checkout(session_token)
+    return client.wait_for_checkout(session_token)
 
 
 def guided_api_key_setup(existing_key: str = "") -> str | None:
@@ -176,7 +193,7 @@ def guided_api_key_setup(existing_key: str = "") -> str | None:
             print()
             return None
         if not _EMAIL_RE.fullmatch(email):
-            print("Email format is incorrect.")
+            print(color("Email format is incorrect.", Colors.RED))
             return None
 
         stage = "checking account"
@@ -219,11 +236,20 @@ def guided_api_key_setup(existing_key: str = "") -> str | None:
                 )
             )
             stage = "waiting for checkout"
-            _open_and_wait(client, session_token, checkout_url)
+            paid_session_token = _open_and_wait(
+                client,
+                session_token,
+                checkout_url,
+            )
             stage = "exchanging checkout for API key"
-            api_key = client.exchange_checkout(bearer, session_token)
+            api_key = client.exchange_checkout(bearer, paid_session_token)
             print()
-            print(f"Top-up successful - ${amount / 100:.0f} credited to your account")
+            print(
+                color(
+                    f"Top-up successful - ${amount / 100:.0f} credited to your account",
+                    Colors.GREEN,
+                )
+            )
             print()
             print(f"We've emailed you a magic link to {email}.")
             print("Use it to access your aimlapi.com account and review your usage.")

@@ -60,7 +60,7 @@ You need at least one way to connect to an LLM. Use `hermes model` to switch pro
 For the official Google API-key path, see the dedicated
 [Google Gemini guide](/guides/google-gemini).
 
-### AI/ML API
+### aimlapi.com
 
 Select **aimlapi.com** in `hermes model`, then use the guided email flow and
 browser checkout or paste an existing API key. Hermes stores the resulting
