@@ -79,10 +79,10 @@ def _prompt_amount() -> int | None:
             continue
         minor = round(amount * 100)
         if minor < MIN_AMOUNT_USD_MINOR:
-            print(f"  Minimum top-up is ${minimum:.0f}.")
+            print(color(f"  Minimum top-up is ${minimum:.0f}.", Colors.RED))
             continue
         if minor > MAX_AMOUNT_USD_MINOR:
-            print(f"  Maximum top-up is ${maximum:.0f}.")
+            print(color(f"  Maximum top-up is ${maximum:.0f}.", Colors.RED))
             continue
         return minor
 
@@ -186,15 +186,20 @@ def guided_api_key_setup(existing_key: str = "") -> str | None:
 
         client = AimlapiClient(resolve_endpoints())
         print()
-        print("  Enter your email.")
-        try:
-            email = input("  Email: ").strip().lower()
-        except (KeyboardInterrupt, EOFError):
+
+        while True:
+            print("  Enter your email.")
+            try:
+                email = input("  Email: ").strip().lower()
+            except (KeyboardInterrupt, EOFError):
+                print()
+                return None
+
+            if _EMAIL_RE.fullmatch(email):
+                break
+
+            print(color("  Email format is incorrect. Please try again.", Colors.RED))
             print()
-            return None
-        if not _EMAIL_RE.fullmatch(email):
-            print(color("Email format is incorrect.", Colors.RED))
-            return None
 
         stage = "checking account"
         action = client.check_account(email)
