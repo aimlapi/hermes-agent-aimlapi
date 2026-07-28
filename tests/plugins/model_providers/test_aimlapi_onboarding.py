@@ -1,3 +1,5 @@
+import pytest
+
 from providers import get_provider_profile
 
 assert get_provider_profile("aimlapi") is not None
@@ -51,11 +53,11 @@ class _NewAccountClient:
 
     def wait_for_checkout(self, session_token):
         assert session_token == "session-token"
-        return "paid"
+        return "paid-session-token"
 
     def exchange_checkout(self, bearer, session_token):
         assert bearer == "auth-token"
-        assert session_token == "session-token"
+        assert session_token == "paid-session-token"
         return "issued-key"
 
 
@@ -116,7 +118,13 @@ def test_new_account_checkout_matches_canonical_flow(monkeypatch, capsys):
         lambda *_args: next(choices),
     )
     monkeypatch.setattr(onboarding_module.webbrowser, "open", lambda _url: True)
-    answers = iter(("user@example.com", ""))
+    monkeypatch.setattr(
+        onboarding_module,
+        "color",
+        lambda text, code: f"<{code}>{text}</>",
+    )
+    monkeypatch.setattr(onboarding_module, "_prompt_prefilled", lambda *_args: "25")
+    answers = iter(("user@example.com",))
     monkeypatch.setattr("builtins.input", lambda _prompt: next(answers))
 
     assert guided_api_key_setup("") == "issued-key"
@@ -128,8 +136,14 @@ def test_new_account_checkout_matches_canonical_flow(monkeypatch, capsys):
         True,
     )
     output = capsys.readouterr().out
-    assert "Opening checkout in browser..." in output
-    assert "Top-up successful - $25 credited to your account" in output
+    assert (
+        f"<{onboarding_module.Colors.YELLOW}>  Opening checkout in browser...</>"
+        in output
+    )
+    assert (
+        f"<{onboarding_module.Colors.GREEN}>"
+        "Top-up successful - $25 credited to your account</>" in output
+    )
     assert "We've emailed you a magic link to user@example.com." in output
 
 
@@ -148,7 +162,11 @@ def test_existing_account_sign_in_uses_six_digit_code(monkeypatch):
 
 def test_amount_reprompts_for_non_finite_and_below_minimum(monkeypatch, capsys):
     answers = iter(("nan", "10", "25"))
-    monkeypatch.setattr("builtins.input", lambda _prompt: next(answers))
+    monkeypatch.setattr(
+        onboarding_module,
+        "_prompt_prefilled",
+        lambda *_args: next(answers),
+    )
 
     assert _prompt_amount() == 2500
     output = capsys.readouterr().out
@@ -156,8 +174,25 @@ def test_amount_reprompts_for_non_finite_and_below_minimum(monkeypatch, capsys):
     assert "Minimum top-up is $20." in output
 
 
-def test_idempotent_retry_reuses_same_operation():
+def test_invalid_email_is_printed_in_red(monkeypatch, capsys):
+    monkeypatch.setattr(onboarding_module, "_prompt_choice", lambda *_args: 0)
+    monkeypatch.setattr("builtins.input", lambda _prompt: "not-an-email")
+    monkeypatch.setattr(
+        onboarding_module,
+        "color",
+        lambda text, code: f"<{code}>{text}</>",
+    )
+
+    assert guided_api_key_setup("") is None
+    assert (
+        f"<{onboarding_module.Colors.RED}>Email format is incorrect.</>"
+        in capsys.readouterr().out
+    )
+
+
+def test_idempotent_retry_reuses_same_operation(monkeypatch):
     calls = []
+    monkeypatch.setattr(onboarding_module.time, "sleep", lambda _delay: None)
 
     def operation():
         calls.append("payment-id")
@@ -167,6 +202,35 @@ def test_idempotent_retry_reuses_same_operation():
 
     assert _retry_idempotent(operation) == "ok"
     assert calls == ["payment-id", "payment-id"]
+
+
+def test_idempotent_retry_waits_for_billing_user(monkeypatch):
+    calls = []
+    delays = []
+    monkeypatch.setattr(onboarding_module.time, "sleep", delays.append)
+
+    def operation():
+        calls.append("payment-id")
+        if len(calls) < 5:
+            raise APIError("billing user not found", status=404)
+        return "ok"
+
+    assert _retry_idempotent(operation) == "ok"
+    assert calls == ["payment-id"] * 5
+    assert delays == [1.0, 2.0, 4.0, 8.0]
+
+
+def test_idempotent_retry_does_not_retry_other_client_errors(monkeypatch):
+    calls = []
+    monkeypatch.setattr(onboarding_module.time, "sleep", lambda _delay: None)
+
+    def operation():
+        calls.append("payment-id")
+        raise APIError("invalid request", status=400)
+
+    with pytest.raises(APIError, match="invalid request"):
+        _retry_idempotent(operation)
+    assert calls == ["payment-id"]
 
 
 class _AmbiguousExchangeClient(_NewAccountClient):

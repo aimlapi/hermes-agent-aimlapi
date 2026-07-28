@@ -1,4 +1,4 @@
-"""Small stdlib client for AI/ML API guided onboarding."""
+"""Small stdlib client for aimlapi.com guided onboarding."""
 
 from __future__ import annotations
 
@@ -80,25 +80,25 @@ class AimlapiClient:
             elif len(detail) > 300:
                 detail = detail[:300]
             raise APIError(
-                f"AI/ML API request failed ({status})"
+                f"aimlapi.com request failed ({status})"
                 + (f": {detail}" if detail else ""),
                 status=status,
             ) from None
         except (urllib.error.URLError, TimeoutError, OSError) as exc:
-            raise APIError(f"AI/ML API request could not be completed: {exc}") from None
+            raise APIError(f"aimlapi.com request could not be completed: {exc}") from None
 
         if len(raw) > _MAX_RESPONSE_BYTES:
-            raise APIError("AI/ML API response exceeded the 1 MB safety limit")
+            raise APIError("aimlapi.com response exceeded the 1 MB safety limit")
         if status < 200 or status >= 300:
-            raise APIError(f"AI/ML API request failed ({status})", status=status)
+            raise APIError(f"aimlapi.com request failed ({status})", status=status)
         if not raw.strip():
             return {}
         try:
             result = json.loads(raw.decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError):
-            raise APIError("AI/ML API returned an invalid JSON response") from None
+            raise APIError("aimlapi.com returned an invalid JSON response") from None
         if not isinstance(result, dict):
-            raise APIError("AI/ML API returned an unexpected response shape")
+            raise APIError("aimlapi.com returned an unexpected response shape")
         return result
 
     def check_account(self, email: str) -> str:
@@ -109,7 +109,7 @@ class AimlapiClient:
         )
         action = str(data.get("action") or "")
         if action not in {"sign-in", "sign-up"}:
-            raise APIError("AI/ML API returned an unsupported account action")
+            raise APIError("aimlapi.com returned an unsupported account action")
         return action
 
     def send_sign_in_code(self, email: str) -> None:
@@ -130,7 +130,7 @@ class AimlapiClient:
         )
         token = str(data.get("token") or "").strip()
         if not token:
-            raise APIError("AI/ML API did not return an auth token")
+            raise APIError("aimlapi.com did not return an auth token")
         return token
 
     def create_passwordless_account(self, email: str) -> str:
@@ -148,7 +148,7 @@ class AimlapiClient:
         )
         token = str(data.get("token") or "").strip()
         if not token:
-            raise APIError("AI/ML API did not return an auth token")
+            raise APIError("aimlapi.com did not return an auth token")
         return token
 
     def create_key(self, bearer: str) -> str:
@@ -160,7 +160,7 @@ class AimlapiClient:
         )
         key = str(data.get("key") or "").strip()
         if not key:
-            raise APIError("AI/ML API did not return an API key")
+            raise APIError("aimlapi.com did not return an API key")
         return key
 
     def create_checkout_session(self) -> str:
@@ -178,7 +178,7 @@ class AimlapiClient:
         )
         token = str(data.get("sessionToken") or "").strip()
         if not token:
-            raise APIError("AI/ML API did not return a checkout session")
+            raise APIError("aimlapi.com did not return a checkout session")
         return token
 
     def start_checkout(
@@ -238,7 +238,7 @@ class AimlapiClient:
         )
         key = str(data.get("apiKey") or "").strip()
         if not key:
-            raise APIError("AI/ML API did not return an API key")
+            raise APIError("aimlapi.com did not return an API key")
         return key
 
     @staticmethod
@@ -256,7 +256,7 @@ class AimlapiClient:
             and not parsed.password
         )
         if not trusted_checkout:
-            raise APIError("AI/ML API returned an invalid checkout URL")
+            raise APIError("aimlapi.com returned an invalid checkout URL")
         return normalized
 
     def wait_for_checkout(
@@ -277,13 +277,14 @@ class AimlapiClient:
                 continue
             status = str(data.get("status") or "").lower()
             if status == "paid":
-                return status
+                paid_session_token = str(data.get("sessionToken") or "").strip()
+                return paid_session_token or session_token
             if status == "exchanged":
                 raise APIError(
-                    "AI/ML API checkout was already exchanged; rotate the key "
+                    "aimlapi.com checkout was already exchanged; rotate the key "
                     "from the dashboard"
                 )
             if status in {"cancelled", "expired", "failed"}:
-                raise APIError(f"AI/ML API checkout ended with status: {status}")
+                raise APIError(f"aimlapi.com checkout ended with status: {status}")
             time.sleep(poll_interval)
-        raise APIError("AI/ML API checkout timed out")
+        raise APIError("aimlapi.com checkout timed out")

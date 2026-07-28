@@ -1,4 +1,4 @@
-"""Configuration and attribution for the AI/ML API Hermes plugin."""
+"""Configuration and attribution for the aimlapi.com Hermes plugin."""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ DEFAULT_PARTNER_ID = "part_H9mK4xR7vT2qN8pL5cY3wBfD"
 DEFAULT_PARTNER_NAME = "hermes-agent"
 INTEGRATION_REPO = "NousResearch/hermes-agent"
 INTEGRATION_VERSION = "1.0.0"
+SOURCE = "agent/hermes-agent"
 DEFAULT_MODEL = "anthropic/claude-sonnet-5"
 
 MIN_AMOUNT_USD_MINOR = 2_000
@@ -63,7 +64,7 @@ def resolve_return_url(frontend_base_url: str | None = None) -> str:
 
 def attribution_headers() -> dict[str, str]:
     return {
-        "X-AIMLAPI-Source": "agent",
+        "X-AIMLAPI-Source": SOURCE,
         "X-AIMLAPI-Partner-ID": resolve_partner_id(),
         "X-AIMLAPI-Integration-Repo": INTEGRATION_REPO,
         "X-AIMLAPI-Integration-Version": INTEGRATION_VERSION,
@@ -87,7 +88,7 @@ def is_trusted_aimlapi_url(value: str) -> bool:
 def require_trusted_aimlapi_url(value: str) -> str:
     normalized = value.strip().rstrip("/")
     if not is_trusted_aimlapi_url(normalized):
-        raise ValueError("AI/ML API endpoints must use HTTPS on aimlapi.com")
+        raise ValueError("aimlapi.com endpoints must use HTTPS on aimlapi.com")
     return normalized
 
 

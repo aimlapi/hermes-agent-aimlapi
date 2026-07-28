@@ -10,9 +10,9 @@ assert aimlapi is not None
 def test_hermes_flow_uses_guided_key_fixed_url_and_live_catalog(monkeypatch):
     assert PROVIDER_REGISTRY["aimlapi"].api_key_env_vars == ("AIMLAPI_API_KEY",)
     assert any(entry.slug == "aimlapi" for entry in CANONICAL_PROVIDERS)
-    assert CANONICAL_PROVIDERS[1].slug == "aimlapi"
+    assert CANONICAL_PROVIDERS[0].slug == "aimlapi"
     assert (
-        CANONICAL_PROVIDERS[1].tui_desc == "aimlapi.com (1000+ models, one-click setup)"
+        CANONICAL_PROVIDERS[0].tui_desc == "aimlapi.com (1000+ models, one-click setup)"
     )
     config = {"model": {"default": "old-model"}}
     saved = {}

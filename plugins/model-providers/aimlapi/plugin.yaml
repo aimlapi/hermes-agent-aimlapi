@@ -1,5 +1,5 @@
 name: aimlapi-provider
 kind: model-provider
 version: 1.0.0
-description: AI/ML API provider with guided account setup
-author: AI/ML API
+description: aimlapi.com provider with guided account setup
+author: aimlapi.com
