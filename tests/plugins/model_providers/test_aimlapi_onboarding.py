@@ -122,18 +122,21 @@ def test_existing_key_is_validated_and_accepted_without_balance_check(
     assert "Everything is ready." in capsys.readouterr().out
 
 
-def test_invalid_pasted_key_is_rejected_and_saved_key_is_unchanged(
+def test_invalid_pasted_key_reprompts_until_valid(
     monkeypatch,
     capsys,
 ):
     class RejectingClient:
         def __init__(self, _endpoints):
-            pass
+            self.validated = []
 
-        def validate_api_key(self, _api_key):
-            raise APIError("authentication was rejected", status=401)
+        def validate_api_key(self, api_key):
+            self.validated.append(api_key)
+            if api_key == "not-a-real-key":
+                raise APIError("authentication was rejected", status=401)
 
     choices = iter((1, 1))
+    pasted_keys = iter(("not-a-real-key", "valid-key"))
     monkeypatch.setattr(
         onboarding_module,
         "_prompt_choice",
@@ -143,7 +146,7 @@ def test_invalid_pasted_key_is_rejected_and_saved_key_is_unchanged(
     monkeypatch.setattr(
         onboarding_module.getpass,
         "getpass",
-        lambda _prompt: "not-a-real-key",
+        lambda _prompt: next(pasted_keys),
     )
     monkeypatch.setattr(
         onboarding_module,
@@ -151,10 +154,14 @@ def test_invalid_pasted_key_is_rejected_and_saved_key_is_unchanged(
         lambda text, code: f"<{code}>{text}</>",
     )
 
-    assert guided_api_key_setup("saved-key") is None
+    assert guided_api_key_setup("saved-key") == "valid-key"
     output = capsys.readouterr().out
     assert "The aimlapi.com key is invalid or revoked." in output
-    assert "Your previously saved key was not changed." in output
+    assert output.count("Enter your aimlapi.com key.") == 2
+    assert (
+        f"<{onboarding_module.Colors.GREEN}>Everything is ready.</>"
+        in output
+    )
 
 
 def test_new_account_checkout_matches_canonical_flow(monkeypatch, capsys):
@@ -186,6 +193,10 @@ def test_new_account_checkout_matches_canonical_flow(monkeypatch, capsys):
     )
     output = capsys.readouterr().out
     assert (
+        f"<{onboarding_module.Colors.YELLOW}>  Enter your email.</>"
+        in output
+    )
+    assert (
         f"<{onboarding_module.Colors.YELLOW}>  Opening checkout in browser...</>"
         in output
     )
@@ -193,20 +204,74 @@ def test_new_account_checkout_matches_canonical_flow(monkeypatch, capsys):
         f"<{onboarding_module.Colors.GREEN}>"
         "Top-up successful - $25 credited to your account</>" in output
     )
+    assert (
+        f"<{onboarding_module.Colors.GREEN}>Everything is ready.</>"
+        in output
+    )
     assert "We've emailed you a magic link to user@example.com." in output
 
 
-def test_existing_account_sign_in_uses_six_digit_code(monkeypatch):
+def test_existing_account_sign_in_uses_colored_six_digit_code(
+    monkeypatch,
+    capsys,
+):
     monkeypatch.setattr(
         onboarding_module,
         "AimlapiClient",
         _ExistingAccountClient,
     )
     monkeypatch.setattr(onboarding_module, "_prompt_choice", lambda *_args: 0)
+    prompts = []
     answers = iter(("user@example.com", "123456"))
-    monkeypatch.setattr("builtins.input", lambda _prompt: next(answers))
+
+    def prompt(prompt_text):
+        prompts.append(prompt_text)
+        return next(answers)
+
+    monkeypatch.setattr("builtins.input", prompt)
+    monkeypatch.setattr(
+        onboarding_module,
+        "color",
+        lambda text, code: f"<{code}>{text}</>",
+    )
 
     assert guided_api_key_setup("") == "issued-key"
+    assert (
+        f"<{onboarding_module.Colors.YELLOW}>  "
+        "Enter the 6-digit code sent to user@example.com: </>"
+        in prompts
+    )
+    output = capsys.readouterr().out
+    assert (
+        f"<{onboarding_module.Colors.YELLOW}>  Enter your email.</>"
+        in output
+    )
+    assert (
+        f"<{onboarding_module.Colors.GREEN}>Everything is ready.</>"
+        in output
+    )
+
+
+def test_invalid_six_digit_code_is_printed_in_red(monkeypatch, capsys):
+    monkeypatch.setattr(
+        onboarding_module,
+        "AimlapiClient",
+        _ExistingAccountClient,
+    )
+    monkeypatch.setattr(onboarding_module, "_prompt_choice", lambda *_args: 0)
+    answers = iter(("user@example.com", "invalid"))
+    monkeypatch.setattr("builtins.input", lambda _prompt: next(answers))
+    monkeypatch.setattr(
+        onboarding_module,
+        "color",
+        lambda text, code: f"<{code}>{text}</>",
+    )
+
+    assert guided_api_key_setup("") is None
+    assert (
+        f"<{onboarding_module.Colors.RED}>  Code is incorrect.</>"
+        in capsys.readouterr().out
+    )
 
 
 def test_amount_reprompts_for_non_finite_and_below_minimum(monkeypatch, capsys):

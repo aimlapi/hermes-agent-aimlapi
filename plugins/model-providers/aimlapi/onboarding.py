@@ -122,6 +122,10 @@ def _prompt_auto_top_up() -> bool | None:
     return selected == 0
 
 
+def _print_ready() -> None:
+    print(color("  Everything is ready.", Colors.GREEN))
+
+
 def _open_and_wait(
     client: AimlapiClient,
     session_token: str,
@@ -158,7 +162,7 @@ def guided_api_key_setup(existing_key: str = "") -> str | None:
             if selected is None:
                 return None
             if selected == 0:
-                print("Everything is ready.")
+                _print_ready()
                 return existing_key.strip()
 
         selected = _prompt_choice(
@@ -168,49 +172,58 @@ def guided_api_key_setup(existing_key: str = "") -> str | None:
         if selected is None:
             return None
         if selected == 1:
-            print()
-            print("  Enter your aimlapi.com key.")
-            try:
-                api_key = getpass.getpass("  Paste your key: ").strip()
-            except (KeyboardInterrupt, EOFError):
-                print()
-                return None
-            if not api_key:
-                print(
-                    "API key is invalid. Please make sure you enter a valid "
-                    "aimlapi.com key."
-                )
-                return None
             client = AimlapiClient(resolve_endpoints())
-            try:
-                client.validate_api_key(api_key)
-            except APIError as exc:
-                _debug("validating pasted API key", exc)
-                if exc.status in {401, 403}:
-                    print(color("The aimlapi.com key is invalid or revoked.", Colors.RED))
-                else:
+            while True:
+                print()
+                print(color("  Enter your aimlapi.com key.", Colors.YELLOW))
+                
+                try:
+                    api_key = getpass.getpass("  Paste your key: ").strip()
+                except (KeyboardInterrupt, EOFError):
+                    print()
+                    return None
+                if not api_key:
                     print(
                         color(
-                            "The aimlapi.com key could not be validated. "
-                            "Please try again.",
+                            "  API key is invalid. Please make sure you enter a "
+                            "valid aimlapi.com key.",
                             Colors.RED,
                         )
                     )
-                if existing_key.strip():
-                    print("Your previously saved key was not changed.")
-                else:
-                    print("No API key was saved.")
-                return None
-            print("Everything is ready.")
-            return api_key
+                    continue
+                try:
+                    client.validate_api_key(api_key)
+                except APIError as exc:
+                    _debug("validating pasted API key", exc)
+                    if exc.status in {401, 403}:
+                        print(
+                            color(
+                                "  The aimlapi.com key is invalid or revoked. "
+                                "Please try again.",
+                                Colors.RED,
+                            )
+                        )
+                    else:
+                        print(
+                            color(
+                                "  The aimlapi.com key could not be validated. "
+                                "Please try again.",
+                                Colors.RED,
+                            )
+                        )
+                    continue
+                _print_ready()
+                return api_key
 
         client = AimlapiClient(resolve_endpoints())
         print()
 
         while True:
-            print("  Enter your email.")
+            print(color("  Enter your email.", Colors.YELLOW))
             try:
                 email = input("  Email: ").strip().lower()
+                print()
+                
             except (KeyboardInterrupt, EOFError):
                 print()
                 return None
@@ -227,12 +240,17 @@ def guided_api_key_setup(existing_key: str = "") -> str | None:
             stage = "sending sign-in code"
             client.send_sign_in_code(email)
             try:
-                code = input(f"  Enter the 6-digit code sent to {email}: ").strip()
+                code = input(
+                    color(
+                        f"  Enter the 6-digit code sent to {email}: ",
+                        Colors.YELLOW,
+                    )
+                ).strip()
             except (KeyboardInterrupt, EOFError):
                 print()
                 return None
             if not re.fullmatch(r"\d{6}", code):
-                print("Code is incorrect.")
+                print(color("  Code is incorrect.", Colors.RED))
                 return None
             stage = "verifying sign-in code"
             bearer = client.verify_sign_in_code(email, code)
@@ -271,18 +289,18 @@ def guided_api_key_setup(existing_key: str = "") -> str | None:
             print()
             print(
                 color(
-                    f"Top-up successful - ${amount / 100:.0f} credited to your account",
+                    f"  Top-up successful - ${amount / 100:.0f} credited to your account",
                     Colors.GREEN,
                 )
             )
             print()
-            print(f"We've emailed you a magic link to {email}.")
-            print("Use it to access your aimlapi.com account and review your usage.")
+            print(f"  We've emailed you a magic link to {email}.")
+            print("  Use it to access your aimlapi.com account and review your usage.")
 
         print()
-        print("Everything is ready.")
+        _print_ready()
         return api_key
     except (APIError, ValueError) as exc:
         _debug(stage, exc)
-        print("Sign in failed, please try again.")
+        print("  Sign in failed, please try again.")
         return None
