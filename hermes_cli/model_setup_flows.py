@@ -2710,6 +2710,34 @@ def _select_zai_endpoint(current_base: str) -> str:
     return options[selected][1].rstrip("/")
 
 
+def _prompt_guided_api_key_setup(
+    profile,
+    pconfig,
+    existing_key: str,
+    *,
+    save_api_key,
+) -> tuple[str, bool]:
+    """Run a provider plugin's guided key flow and persist its result."""
+    try:
+        resolved_key = profile.guided_api_key_setup(existing_key)
+    except (KeyboardInterrupt, EOFError):
+        print()
+        return existing_key, True
+    except Exception:
+        print("Guided setup failed.")
+        return existing_key, True
+
+    resolved_key = str(resolved_key or "").strip()
+    if not resolved_key:
+        return existing_key, True
+
+    key_env = pconfig.api_key_env_vars[0] if pconfig.api_key_env_vars else ""
+    if not key_env:
+        return existing_key, True
+    save_api_key(key_env, resolved_key)
+    return resolved_key, False
+
+
 def _model_flow_api_key_provider(config, provider_id, current_model=""):
     """Generic flow for API-key providers (z.ai, MiniMax, OpenCode, etc.)."""
     from hermes_cli.main import _prompt_api_key
@@ -2739,12 +2767,28 @@ def _model_flow_api_key_provider(config, provider_id, current_model=""):
     # Check / prompt for API key
     existing_key, existing_source = _existing_api_key_for_model_flow(provider_id, pconfig)
 
-    existing_key, abort = _prompt_api_key(
-        pconfig,
-        existing_key,
-        provider_id=provider_id,
-        existing_source=existing_source,
-    )
+    profile = None
+    try:
+        from providers import get_provider_profile
+
+        profile = get_provider_profile(provider_id)
+    except Exception:
+        pass
+
+    if profile is not None and profile.guided_api_key_setup is not None:
+        existing_key, abort = _prompt_guided_api_key_setup(
+            profile,
+            pconfig,
+            existing_key,
+            save_api_key=save_env_value,
+        )
+    else:
+        existing_key, abort = _prompt_api_key(
+            pconfig,
+            existing_key,
+            provider_id=provider_id,
+            existing_source=existing_source,
+        )
     if abort:
         return
 
@@ -2832,7 +2876,7 @@ def _model_flow_api_key_provider(config, provider_id, current_model=""):
         if chosen_base and chosen_base != effective_base and base_url_env:
             save_env_value(base_url_env, chosen_base)
         effective_base = chosen_base
-    else:
+    elif profile is None or profile.allow_base_url_override:
         try:
             override = input(f"Base URL [{effective_base}]: ").strip()
         except (KeyboardInterrupt, EOFError):
@@ -2854,7 +2898,33 @@ def _model_flow_api_key_provider(config, provider_id, current_model=""):
     #
     # LM Studio: live /api/v1/models probe (no models.dev catalog).
     # Ollama Cloud: merged discovery (live API + models.dev + disk cache).
-    if provider_id == "lmstudio":
+    if profile is not None and profile.prefer_live_model_discovery:
+        api_key_for_probe = existing_key or (
+            get_env_value(key_env) if key_env else ""
+        )
+        try:
+            live_models = profile.fetch_models(
+                api_key=api_key_for_probe,
+                base_url=effective_base,
+            )
+        except Exception:
+            live_models = None
+        curated = list(profile.fallback_models or ())
+        if live_models:
+            model_list = []
+            seen = set()
+            for model in live_models:
+                if model.lower() not in seen:
+                    model_list.append(model)
+                    seen.add(model.lower())
+            print(f"  Found {len(model_list)} model(s) from {pconfig.name} API")
+        else:
+            model_list = curated
+            if model_list:
+                print(
+                    f'  Showing {len(model_list)} curated models - use "Enter custom model name" for others.'
+                )
+    elif provider_id == "lmstudio":
         from hermes_cli.auth import AuthError
         from hermes_cli.models import fetch_lmstudio_models
 
